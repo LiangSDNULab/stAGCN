@@ -42,13 +42,13 @@ class GraphConvolution(Module):
             self.bias.data.uniform_(-stdv, stdv)
 
     def forward(self, input, adj,active=True):
-        input = input.float()  # 3639，750 点、基因数
-        support = torch.mm(input, self.weight)  # 3639.1024
+        input = input.float()
+        support = torch.mm(input, self.weight)
         # Debugging information
         # print(f"input shape: {input.shape}")
         # print(f"adj shape: {adj.shape}")
         # print(f"support shape: {support.shape}")
-        output = torch.spmm(adj, support)  # 3639.1024
+        output = torch.spmm(adj, support)
         if active:
             output = F.relu(output)
         if self.bias is not None:
@@ -70,11 +70,11 @@ class Attention(nn.Module):
         self.project = nn.Linear(in_size, 1, bias=False).float()
 
     def forward(self, z):
-        w = self.project(z)  # 3639，1 self.project(z)将输入的特征向量z通过线性变换层映射到权重向量w
-        beta = torch.softmax(w, dim=1)  # 3639，1然后使用torch.softmax函数对权重向量w进行softmax归一化，得到注意力权重beta。
-        emb = torch.sum(beta * z, dim=1)  # （3639，）
+        w = self.project(z)
+        beta = torch.softmax(w, dim=1)
+        emb = torch.sum(beta * z, dim=1)
         return emb, w
-        # return (beta*z).sum(1),beta  #表示返回加权求和的结果和注意力权重beta。
+
 
 
 class AE(nn.Module):
@@ -106,8 +106,7 @@ class AE(nn.Module):
         return x_bar, enc_h1, enc_h2, enc_h3, z
 
 class STAGCN(nn.Module):
-    def __init__(self, n_latent, genenumber, num_classes, n_layers=3, dropout=0.1):
-        # 初始化类。定义了一个MGCN层（Multi-Graph Convolutional Network，MGCN）和一个聚类层（cluster layer）。聚类层是一个参数矩阵，用于表示每个类别下的特征向量。
+    def __init__(self, n_latent, genenumber, num_classes):
         super(STAGCN, self).__init__()
         self.gnn_1 = GraphConvolution(genenumber, 512)
         self.gnn_2 = GraphConvolution(512, 256)
@@ -123,7 +122,7 @@ class STAGCN(nn.Module):
             n_dec_3=512,
             n_input=genenumber,
             n_z=128)
-        self.scale = nn.Parameter(torch.randn(genenumber))  # 是一个可学习的参数，用于调整解码器输出的缩放。
+        self.scale = nn.Parameter(torch.randn(genenumber))
         self.additive = nn.Parameter(torch.randn(genenumber))
         self.attention1 = Attention(512)
         self.attention2 = Attention(256)
@@ -131,21 +130,21 @@ class STAGCN(nn.Module):
         self.attention4 = Attention(128)
 
 
-    def forward(self, x, adj1):  # 输入参数包括输入特征`x`3639，750、邻接矩阵`adj1`和`adj2`
+    def forward(self, x, adj1):
         x = x.float()
         x_bar, tra1, tra2, tra3, z = self.ae(x)
 
         h = self.gnn_1(x, adj1)
-        emb = torch.stack([h, tra1], dim=1)  # 将这两个表示向量拼接在一起，得到emb
+        emb = torch.stack([h, tra1], dim=1)
         emb, _ = self.attention1(emb)
         h = self.gnn_2(emb, adj1)
-        emb = torch.stack([h, tra2], dim=1)  # 将这两个表示向量拼接在一起，得到emb
+        emb = torch.stack([h, tra2], dim=1)
         emb, _ = self.attention2(emb)
         h = self.gnn_3(emb, adj1)
-        emb = torch.stack([h, tra3], dim=1)  # 将这两个表示向量拼接在一起，得到emb
+        emb = torch.stack([h, tra3], dim=1)
         emb, _ = self.attention3(emb)
         h = self.gnn_4(emb, adj1)
-        emb = torch.stack([h, z], dim=1)  # 将这两个表示向量拼接在一起，得到emb
+        emb = torch.stack([h, z], dim=1)
         emb, _ = self.attention4(emb)
         output = self.gnn_5(emb, adj1, active=False)
 

@@ -1,6 +1,6 @@
 import sys
 from torch.nn import Linear
-sys.path.append('/home/lcheng/ZhuJunTong/CIForm-main/ciform/')
+sys.path.append('/home/lcheng/ZhuJunTong/stAGCN-main/stAGCN/')
 
 import warnings
 import anndata
@@ -66,15 +66,6 @@ def loss_function(pred_ys, xs, umi_counts, mu_expr, px_r, recon, scale, additive
 
 
 
-##main
-##parameters
-# s                  :the length of a sub-vector 子向量的长度
-# referece_datapath  :the path of referece dataset 参考数据集的路径
-# query_datapath     :the path pf test dataset 测试数据集的路径
-# label_path         :the path of cell type annotation file(.csv) 单元格类型注释文件的路径
-# T
-#                  T==True：The rows represent the cells and the columns represent the genes 行代表细胞，列代表基因
-#                  T=False: The rows represent the genes and the columns represent the cells 行代表基因，列代表细胞
 def main():
     adj1 = load_graph(st_adata, l=20)
     adj1 = adj1.to(device)
@@ -94,19 +85,18 @@ def main():
 
     # Set parameters of stAGCN
     num_classes = len(cell_type_list)  # the number of cell types
-    # 准备输入数据
     st_data_df = st_adata.to_df()
     st_data = st_data_df.values.astype(np.float32)
 
     l = st_adata.shape[0]
     d = st_adata.shape[1]
 
-    # Constructing the CIForm model构建CIForm模型
-    model = STAGCN(n_latent=128, num_classes=num_classes, genenumber=d)  # n_latent应该比基因小才对
+    # Constructing the stAGCN model
+    model = STAGCN(n_latent=128, num_classes=num_classes, genenumber=d)
     model.to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=0.001)
-    umi_counts = torch.tensor(st_data.astype(np.float32))  # 将数据转换为 PyTorch 张量。120个点的UMI值
-    umi_counts = umi_counts[umi_counts.sum(dim=1) != 0]  # 从数据中删除总 UMI 计数为零的行。
+    umi_counts = torch.tensor(st_data.astype(np.float32))
+    umi_counts = umi_counts[umi_counts.sum(dim=1) != 0]
     xs = umi_counts
     xs = xs.to(torch.double)
     xs = xs.to(device)
@@ -114,17 +104,17 @@ def main():
 
     model.train()
     for epoch in range(n_epochs):
-        sc_px_r = disper.repeat(l, 1)  # 重复方差batch_sizes次
+        sc_px_r = disper.repeat(l, 1)
         sc_px_r = sc_px_r.to(device)
         logits, recon, scale, additive = model(xs, adj1)
         logits = F.softmax(logits, dim=1)
-        scale = scale.repeat(l, 1)  # 被重复以匹配批处理大小。
+        scale = scale.repeat(l, 1)
         additive = additive.repeat(l, 1)
         loss = loss_function(logits, xs, umi_counts, mu_expr, sc_px_r, recon, scale, additive)
         loss = loss.to(device)
         optimizer.zero_grad()
-        loss.backward()  # 计算损失值的梯度（loss.backward()）。
-        optimizer.step()  # 使用优化器更新模型参数（optimizer.step()）。
+        loss.backward()
+        optimizer.step()
         print('epoch:',epoch)
 
     model.eval()
@@ -134,7 +124,7 @@ def main():
     logits = F.softmax(logits, dim=1)
     y_predict.append(logits)
 
-    # 使用torch.cat函数将所有logits合并到一起
+
     y_predict = torch.cat(y_predict, dim=1)
     y_predict_cpu = y_predict.cpu().numpy()
 
@@ -166,9 +156,9 @@ def main():
         plt.savefig('mba_test.jpg')
 
 
-file_fold = '/home/lcheng/ZhuJunTong/stVAE-main/lustre/Mouse_Brain_Anterior/'
+file_fold = '.../dataset/Mouse_Brain_Anterior/'
 st_adata = sc.read_visium(file_fold, count_file='filtered_feature_bc_matrix.h5', load_images=True)
-sc_file = '/home/lcheng/ZhuJunTong/stVAE-main/lustre/Mouse_Brain_Anterior/scRNA.h5ad'
+sc_file = '.../dataset/Mouse_Brain_Anterior/scRNA.h5ad'
 sc_adata=anndata.read_h5ad(sc_file)
 
 
